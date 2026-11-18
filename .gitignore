@@ -1,0 +1,10 @@
+﻿# Python sanal ortam
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# IDE
+.idea/
+*.iml

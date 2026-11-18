@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNN Temel Yapısı — Sunum</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="viewport">
+<div id="stage">
+
+<!-- ======================================================= 1 KAPAK -->
+<section class="slide title-slide">
+  <h1>Derin Öğrenme ve Evrişimsel Sinir Ağlarının (CNN) Temel Yapısının İncelenmesi</h1>
+  <div class="meta">
+    <div><b>Ad Soyad:</b> Muhammed Baki Aslanhan</div>
+    <div><b>Numara:</b> 02230224077</div>
+    <div><b>Ders:</b> Bilgisayar Görmesi</div>
+  </div>
+  <div class="tech">Python · TensorFlow / Keras · Fashion-MNIST</div>
+  <aside class="notes">
+    <p>Merhaba. Bu sunumda ödevimde yaptığım çalışmayı baştan sona anlatacağım: derin öğrenmenin temel kavramlarından başlayıp, konvolüsyon ve pooling katmanlarını kodla inceleyecek, sonra Fashion-MNIST üzerinde küçük bir CNN eğitip sonuçlarını yorumlayacağım.</p>
+    <p>Gezinme: → / Space ileri, ← geri, N notlar, O genel görünüm, F tam ekran.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 2 İÇERİK -->
+<section class="slide" data-sec="İçerik">
+  <h2>Sunumun akışı</h2>
+  <div class="toc">
+    <a href="#3"><span class="k">1</span>Giriş: amaç ve çalışma ortamı<span class="s">3</span></a>
+    <a href="#5"><span class="k">2</span>Temel kavramlar<span class="s">5</span></a>
+    <a href="#20"><span class="k">3</span>Konvolüsyonun kodlanması<span class="s">20</span></a>
+    <a href="#27"><span class="k">4</span>Pooling'in incelenmesi<span class="s">27</span></a>
+    <a href="#31"><span class="k">5</span>ReLU ve Softmax<span class="s">31</span></a>
+    <a href="#34"><span class="k">6</span>CNN modeli ve eğitim<span class="s">34</span></a>
+    <a href="#41"><span class="k">7</span>Mimarinin anlaşılması<span class="s">41</span></a>
+    <a href="#45"><span class="k">8</span>Filtre sayısı deneyi<span class="s">45</span></a>
+    <a href="#51"><span class="k">★</span>Terimler sözlüğü ve sorular<span class="s">51</span></a>
+  </div>
+  <aside class="notes">
+    <p>Sunum ödevin bölümlerini sırayla takip ediyor. Önce sözel soruların cevaplarıyla kavramları kuruyorum, sonra her kavramı kodla ve gerçek çıktılarla gösteriyorum.</p>
+    <p>Kutulara tıklayarak doğrudan ilgili bölüme gidilebilir.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 3 AMAÇ -->
+<section class="slide" data-sec="Giriş">
+  <h2>Ödevin amacı</h2>
+  <div class="cols w40">
+    <div>
+      <ul class="b">
+        <li>Sadece <b>çalışan bir model</b> değil…</li>
+        <li>…her katmanın <b>görevini</b> anlamak,</li>
+        <li>giriş / çıkış <b>boyutlarının</b> nasıl değiştiğini görmek,</li>
+        <li>katmanın <b>veriye ne yaptığını</b> açıklayabilmek.</li>
+      </ul>
+    </div>
+    <div class="card acc">
+      <h3>İncelenen 9 yapı</h3>
+      <ol class="n" style="font-size:28px; columns:2; column-gap:40px">
+        <li>Konvolüsyon katmanı</li>
+        <li>Filtre (kernel)</li>
+        <li>Bias ve ağırlık başlatma</li>
+        <li>Max Pooling</li>
+        <li>ReLU</li>
+        <li>Softmax</li>
+        <li>Flatten</li>
+        <li>Dense katman</li>
+        <li>Uçtan uca CNN + deney</li>
+      </ol>
+      <p class="mt" style="font-size:22px"><span class="todo">[DOLDURULACAK: ödev metnindeki listeyle karşılaştır]</span></p>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Ödevin hedefi yalnızca yüksek doğruluklu bir model kurmak değildi; her katmanın ne işe yaradığını, verinin boyutunu nasıl değiştirdiğini ve neden orada durduğunu açıklayabilmekti.</p>
+    <p>Bu yüzden her yapıyı önce tek başına küçük bir örnekle inceledim, sonra hepsini bir modelde birleştirdim.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 4 ORTAM -->
+<section class="slide" data-sec="Giriş">
+  <h2>Çalışma ortamı</h2>
+  <div class="cols">
+    <div>
+      <table class="t">
+        <tr><th>Bileşen</th><th>Sürüm</th></tr>
+        <tr><td>Python</td><td class="num">3.12.7</td></tr>
+        <tr><td>TensorFlow</td><td class="num">2.21.0</td></tr>
+        <tr><td>Keras</td><td class="num">3.15.1</td></tr>
+        <tr><td>NumPy</td><td class="num">2.5.4</td></tr>
+        <tr><td>Matplotlib</td><td class="num">3.11.2</td></tr>
+      </table>
+    </div>
+    <div>
+      <ul class="b">
+        <li><b>IntelliJ IDEA</b> + <b>Jupyter Notebook</b></li>
+        <li>Eğitim <b>CPU</b> üzerinde<br><span class="muted" style="font-size:24px">Windows'ta TF ≥ 2.11 GPU desteklemiyor</span></li>
+        <li>Ortam testi: <code class="inl">(1, 28, 28, 1) → (1, 26, 26, 8)</code> ✓</li>
+        <li>Fashion-MNIST indirildi: <code class="inl">(60000, 28, 28)</code> ✓</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Sürümler notebook'un ilk hücresindeki ortam kontrolü çıktısından alındı. Windows üzerinde TensorFlow 2.11 ve sonrası GPU kullanmadığı için tüm eğitimler CPU'da yapıldı.</p>
+    <p>Ortamı doğrulamak için küçük bir konvolüsyon testi ve veri seti indirme testi çalıştırdım; ikisi de beklenen boyutları verdi.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 5 BÖLÜM 2 KAPAK -->
+<section class="slide section">
+  <div class="num"><span>Bölüm</span>2</div>
+  <h1>Temel kavramlar</h1>
+  <p class="sub">Derin öğrenme · nöron · konvolüsyon · pooling · aktivasyon · dense</p>
+  <aside class="notes">
+    <p>Bu bölümde ödevdeki sözel soruların cevaplarını anlatıyorum. Sonraki bölümlerde kodla göreceğimiz her şeyin temeli burada.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 6 DERİN ÖĞRENME -->
+<section class="slide" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Derin öğrenme nedir?</h2>
+  <p style="max-width:1600px">Çok katmanlı yapay sinir ağlarıyla <b>veriden doğrudan öğrenen</b> bir makine öğrenmesi alt alanı. “Derin” = çok sayıda ardışık katman.</p>
+  <div data-show="1" class="mt">
+    <div class="flowlabel">Klasik makine öğrenmesi</div>
+    <div class="flow">
+      <div class="bx">Ham veri</div><div class="ar">→</div>
+      <div class="bx human big">İnsan özellik çıkarır</div><div class="ar">→</div>
+      <div class="bx model">Model</div><div class="ar">→</div>
+      <div class="bx res">Sonuç</div>
+    </div>
+  </div>
+  <div data-show="2" class="mt">
+    <div class="flowlabel">Derin öğrenme</div>
+    <div class="flow">
+      <div class="bx">Ham veri</div><div class="ar">→</div>
+      <div class="bx model big" style="flex:2.8">Model <span style="font-weight:400">(özellikleri kendisi öğrenir)</span></div><div class="ar">→</div>
+      <div class="bx res">Sonuç</div>
+    </div>
+  </div>
+  <p data-show="3" class="mt muted">Bedeli: çok daha fazla <b>veri</b> ve <b>hesaplama gücü</b>.</p>
+  <aside class="notes">
+    <p>Derin öğrenme, insan beyninden esinlenen çok katmanlı yapay sinir ağlarını kullanan bir makine öğrenmesi alt alanıdır.</p>
+    <p>Temel fark özellik çıkarımında (feature extraction): klasik makine öğrenmesinde özellikleri biz elle tasarlarız, derin öğrenmede ağ ham veriden hangi özelliklerin önemli olduğunu kendisi öğrenir.</p>
+    <p>Bunun karşılığında derin öğrenme çok daha fazla veri ve hesaplama gücü ister.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 7 NÖRON -->
+<section class="slide neuron" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Yapay nöron nasıl çalışır?</h2>
+  <div class="formula" style="align-self:flex-start">y = f(w₁·x₁ + w₂·x₂ + w₃·x₃ + b)</div>
+  <svg width="1240" height="520" viewBox="0 0 1240 520" style="margin-top:30px">
+    <defs><marker id="nr-arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8e97a8"/></marker></defs>
+    <line class="edge" x1="158" y1="90" x2="575" y2="225"/>
+    <line class="edge" x1="158" y1="260" x2="568" y2="260"/>
+    <line class="edge" x1="158" y1="430" x2="575" y2="295"/>
+    <circle class="node-in" cx="110" cy="90" r="48"/><text x="110" y="100" font-size="30" text-anchor="middle" font-weight="700">x₁</text>
+    <circle class="node-in" cx="110" cy="260" r="48"/><text x="110" y="270" font-size="30" text-anchor="middle" font-weight="700">x₂</text>
+    <circle class="node-in" cx="110" cy="430" r="48"/><text x="110" y="440" font-size="30" text-anchor="middle" font-weight="700">x₃</text>
+    <text x="30" y="30" font-size="22" fill="#5b6475">girişler (örnek değerler)</text>
+    <text x="110" y="168" font-size="24" text-anchor="middle" class="mono" fill="#4a5263">1.0</text>
+    <text x="110" y="338" font-size="24" text-anchor="middle" class="mono" fill="#4a5263">0.5</text>
+    <text x="110" y="508" font-size="24" text-anchor="middle" class="mono" fill="#4a5263">−1.0</text>
+
+    <g data-show="1" class="fade">
+      <text class="wt mono" x="190" y="96" font-size="24">w₁ = 0.8</text>
+      <text class="wt mono" x="190" y="246" font-size="24">w₂ = −0.4</text>
+      <text class="wt mono" x="200" y="452" font-size="24">w₃ = 0.3</text>
+    </g>
+    <g data-show="2" class="fade">
+      <text class="pr mono" x="312" y="122" font-size="24">1.0·0.8 = 0.8</text>
+      <text class="pr mono" x="260" y="296" font-size="24">0.5·(−0.4) = −0.2</text>
+      <text class="pr mono" x="300" y="414" font-size="24">−1.0·0.3 = −0.3</text>
+    </g>
+
+    <circle class="node-sum" cx="640" cy="260" r="72"/>
+    <text x="640" y="280" font-size="58" text-anchor="middle" fill="#1f3a8a">Σ</text>
+    <text data-show="3" class="fade mono" x="640" y="372" font-size="26" text-anchor="middle" font-weight="700" fill="#1f3a8a">Σ = 0.3</text>
+    <g data-show="4" class="fade">
+      <text class="mono" x="640" y="110" font-size="26" text-anchor="middle" font-weight="700" fill="#e67700">b = 0.1</text>
+      <line x1="640" y1="122" x2="640" y2="178" stroke="#e67700" stroke-width="4" marker-end="url(#nr-arr)"/>
+      <text class="mono" x="706" y="412" font-size="26" text-anchor="middle" font-weight="700" fill="#1f3a8a">z = 0.3 + 0.1 = 0.4</text>
+    </g>
+
+    <line x1="712" y1="260" x2="830" y2="260" stroke="#8e97a8" stroke-width="4" marker-end="url(#nr-arr)"/>
+    <rect class="node-f" x="840" y="200" width="170" height="120" rx="18"/>
+    <text x="925" y="252" font-size="30" text-anchor="middle" font-weight="700" fill="#2b9348">f</text>
+    <text x="925" y="290" font-size="24" text-anchor="middle" fill="#2b9348">(ReLU)</text>
+    <line x1="1010" y1="260" x2="1080" y2="260" stroke="#8e97a8" stroke-width="4" marker-end="url(#nr-arr)"/>
+    <g data-show="5" class="fade">
+      <text class="mono" x="1092" y="272" font-size="38" font-weight="800" fill="#2b9348">y = 0.4</text>
+      <text class="mono" x="925" y="362" font-size="24" text-anchor="middle" fill="#2b9348">max(0, 0.4) = 0.4</text>
+    </g>
+  </svg>
+  <aside class="notes">
+    <p>Her nöron girişlerini kendi ağırlıklarıyla (weight) çarpar, bu çarpımları toplar, bir bias ekler ve sonucu bir aktivasyon (activation) fonksiyonundan geçirir.</p>
+    <p>Ekrandaki sayılar sadece örnek: 0.8 − 0.2 − 0.3 = 0.3; bias ile 0.4; ReLU pozitif değeri olduğu gibi geçirir, çıkış 0.4.</p>
+    <p>Ağ, bu nöronların katmanlar hâlinde dizilmesinden oluşur: girdi katmanı, gizli katmanlar ve çıktı katmanı.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 8 İLERİ / GERİ YAYILIM -->
+<section class="slide bp" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Eğitim: ileri yayılım ve geri yayılım</h2>
+  <svg width="1680" height="560" viewBox="0 0 1680 560">
+    <g>
+      <line class="edge" x1="160" y1="140" x2="560" y2="80"/><line class="edge" x1="160" y1="140" x2="560" y2="213"/><line class="edge" x1="160" y1="140" x2="560" y2="347"/><line class="edge" x1="160" y1="140" x2="560" y2="480"/>
+      <line class="edge" x1="160" y1="280" x2="560" y2="80"/><line class="edge" x1="160" y1="280" x2="560" y2="213"/><line class="edge" x1="160" y1="280" x2="560" y2="347"/><line class="edge" x1="160" y1="280" x2="560" y2="480"/>
+      <line class="edge" x1="160" y1="420" x2="560" y2="80"/><line class="edge" x1="160" y1="420" x2="560" y2="213"/><line class="edge" x1="160" y1="420" x2="560" y2="347"/><line class="edge" x1="160" y1="420" x2="560" y2="480"/>
+      <line class="edge" x1="560" y1="80" x2="960" y2="200"/><line class="edge" x1="560" y1="80" x2="960" y2="360"/>
+      <line class="edge" x1="560" y1="213" x2="960" y2="200"/><line class="edge" x1="560" y1="213" x2="960" y2="360"/>
+      <line class="edge" x1="560" y1="347" x2="960" y2="200"/><line class="edge" x1="560" y1="347" x2="960" y2="360"/>
+      <line class="edge" x1="560" y1="480" x2="960" y2="200"/><line class="edge" x1="560" y1="480" x2="960" y2="360"/>
+    </g>
+    <g>
+      <circle class="node" cx="160" cy="140" r="34"/><circle class="node" cx="160" cy="280" r="34"/><circle class="node" cx="160" cy="420" r="34"/>
+      <circle class="node" cx="560" cy="80" r="34"/><circle class="node" cx="560" cy="213" r="34"/><circle class="node" cx="560" cy="347" r="34"/><circle class="node" cx="560" cy="480" r="34"/>
+      <circle class="node" cx="960" cy="200" r="34"/><circle class="node" cx="960" cy="360" r="34"/>
+    </g>
+    <text x="160" y="545" font-size="24" text-anchor="middle" fill="#5b6475">Giriş</text>
+    <text x="560" y="545" font-size="24" text-anchor="middle" fill="#5b6475">Gizli katman</text>
+    <text x="960" y="545" font-size="24" text-anchor="middle" fill="#5b6475">Çıkış</text>
+    <g data-show="2" class="fade">
+      <line x1="1000" y1="280" x2="1060" y2="280" stroke="#2563c9" stroke-width="4"/>
+      <rect x="1060" y="225" width="220" height="110" rx="16" fill="#e3edfc" stroke="#2563c9" stroke-width="3"/>
+      <text x="1170" y="272" font-size="28" text-anchor="middle" font-weight="700" fill="#2563c9">Tahmin</text>
+      <text x="1170" y="310" font-size="28" text-anchor="middle" fill="#2563c9" font-style="italic">ŷ</text>
+    </g>
+    <g data-show="3" class="fade">
+      <line x1="1280" y1="280" x2="1340" y2="280" stroke="#d64545" stroke-width="4"/>
+      <rect x="1340" y="200" width="320" height="160" rx="16" fill="#fde8e8" stroke="#d64545" stroke-width="3"/>
+      <text x="1500" y="250" font-size="28" text-anchor="middle" font-weight="700" fill="#d64545">Kayıp (Loss)</text>
+      <text x="1500" y="292" font-size="28" text-anchor="middle" fill="#d64545" class="mono">L(ŷ, y)</text>
+      <text x="1500" y="334" font-size="22" text-anchor="middle" fill="#5b6475">y = gerçek etiket</text>
+    </g>
+  </svg>
+  <div style="position:relative; height:60px; margin-top:10px; font-size:32px; font-weight:600">
+    <div data-show="1" data-hide="4" style="position:absolute; left:0; top:0" class="c-out">① İleri yayılım (forward pass): sinyal soldan sağa akar →</div>
+    <div data-show="4" data-hide="5" style="position:absolute; left:0; top:0" class="c-neg">② Geri yayılım (backpropagation): hatanın gradyanı sağdan sola akar ←</div>
+    <div data-show="5" style="position:absolute; left:0; top:0" class="c-max">③ Ağırlıklar güncellenir: <span class="mono">w ← w − η · ∂L/∂w</span> (Adam / Gradient Descent)</div>
+  </div>
+  <aside class="notes">
+    <p>Eğitim iki adımın tekrarıdır. İleri yayılımda giriş katman katman ilerler ve bir tahmin üretilir.</p>
+    <p>Tahmin ile gerçek etiket arasındaki hata bir kayıp (loss) fonksiyonuyla ölçülür. Geri yayılımda bu hatanın her ağırlığa göre türevi, yani gradyanı hesaplanır.</p>
+    <p>Son olarak bir optimizasyon algoritması (Gradient Descent, Adam) ağırlıkları hatayı azaltacak yönde günceller; bu döngü binlerce kez tekrarlanır.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 9 NEDEN ÇOK KATMAN -->
+<section class="slide" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Neden birden fazla katman?</h2>
+  <div class="hier">
+    <div class="pnl" data-show="1">
+      <svg width="360" height="230" viewBox="0 0 360 230">
+        <g stroke="#4a5263" stroke-width="9" stroke-linecap="round" fill="none">
+          <line x1="40" y1="50" x2="130" y2="50"/><line x1="190" y1="25" x2="190" y2="105"/>
+          <line x1="250" y1="105" x2="320" y2="30"/><path d="M50 140 L50 205 L130 205"/>
+          <path d="M200 140 L290 140 L290 205"/>
+        </g>
+      </svg>
+      <h4>Katman 1: kenar, köşe</h4><p>basit örüntüler</p>
+    </div>
+    <div class="arw" data-show="2">→</div>
+    <div class="pnl" data-show="2">
+      <svg width="360" height="230" viewBox="0 0 360 230">
+        <rect x="30" y="170" width="300" height="34" rx="14" fill="#4a5263"/>
+        <polyline points="150,50 175,80 195,55 220,88 245,62" fill="none" stroke="#2563c9" stroke-width="8" stroke-linejoin="round"/>
+        <path d="M40 150 Q30 90 70 60" fill="none" stroke="#2563c9" stroke-width="9" stroke-linecap="round"/>
+        <path d="M250 150 Q330 140 320 110" fill="none" stroke="#2563c9" stroke-width="9" stroke-linecap="round"/>
+      </svg>
+      <h4>Katman 2: doku, parça</h4><p>taban, bağcık, topuk</p>
+    </div>
+    <div class="arw" data-show="3">→</div>
+    <div class="pnl" data-show="3">
+      <svg width="360" height="230" viewBox="0 0 360 230">
+        <path d="M40 170 L40 85 Q40 70 55 70 L110 70 Q125 110 175 118 L265 132 Q330 145 330 170 Z" fill="#dbe6fb" stroke="#1f3a8a" stroke-width="5" stroke-linejoin="round"/>
+        <polyline points="112,84 132,104 150,90 170,112 188,100" fill="none" stroke="#1f3a8a" stroke-width="5"/>
+        <path d="M28 170 L340 170 Q350 170 350 182 L350 190 Q350 200 338 200 L40 200 Q28 200 28 188 Z" fill="#4a5263"/>
+      </svg>
+      <h4>Katman 3: nesne</h4><p>“bu bir ayakkabı”</p>
+    </div>
+  </div>
+  <div class="card green mt2" data-show="4">
+    Katmanlar arasındaki <b>doğrusal olmayan aktivasyonlar</b> sayesinde ağ karmaşık, doğrusal olmayan ilişkileri modelleyebilir. Tek katman yalnızca doğrusal olarak ayrılabilen ilişkileri öğrenir.
+  </div>
+  <aside class="notes">
+    <p>Temel sebep, gerçek dünyadaki karmaşık ve doğrusal olmayan örüntüleri öğrenebilmek.</p>
+    <p>Birden fazla katman problemi hiyerarşik çözer: ilk katmanlar kenar ve köşe gibi basit örüntüleri, sonraki katmanlar bunları birleştirerek doku ve parçaları, son katmanlar nesnenin tamamını temsil eden soyut özellikleri öğrenir.</p>
+    <p>Bunun çalışması için katmanlar arasında doğrusal olmayan aktivasyonlar şart; bunu birazdan ayrıca göstereceğim.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 10 KONVOLÜSYON -->
+<section class="slide" data-anim="conv" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Konvolüsyon / Evrişim <span class="en">(Convolution)</span></h2>
+  <div class="row" style="gap:64px">
+    <div><div class="glabel c-in">Giriş 7×7</div><div id="cv-in"></div></div>
+    <div>
+      <div class="glabel c-filter">Filtre <span class="en">(kernel)</span> 3×3 · bias b = 1</div><div id="cv-k"></div>
+      <div class="glabel" style="margin-top:22px">Eleman eleman çarpımlar</div><div id="cv-p"></div>
+      <div class="calc-line hidden" id="cv-sum" style="margin-top:18px"></div>
+      <div class="calc-line hidden" id="cv-b"></div>
+    </div>
+    <div>
+      <div class="glabel c-out">Çıktı: özellik haritası <span class="en">(feature map)</span> 5×5</div><div id="cv-out"></div>
+      <div class="formula" style="margin-top:36px">(7 − 3) / 1 + 1 = 5</div>
+      <div class="muted" style="font-size:22px; margin-top:8px">(giriş − kernel) / adım <span class="en">(stride)</span> + 1</div>
+    </div>
+  </div>
+  <div id="cv-pos" class="muted" style="font-size:24px; position:absolute; left:560px; bottom:38px"></div>
+  <aside class="notes">
+    <p>Konvolüsyon, küçük bir ağırlık matrisinin, yani filtrenin, görüntü üzerinde kaydırılarak her konumda yerel bir özellik değerinin hesaplandığı işlemdir.</p>
+    <p>Her adımda filtre altındaki 9 hücreyle eleman eleman çarpılır, çarpımlar toplanır, bias eklenir ve sonuç çıktıdaki karşılık gelen hücreye yazılır. Sonra filtre stride kadar (burada 1) kayar.</p>
+    <p>Filtre 7×7'lik girişte yatayda ve dikeyde yalnızca 5 konuma tam sığar, bu yüzden çıktı 5×5. Bu örnekteki filtre dikey kenar arar; değerler örnek amaçlıdır. → tuşu ile adım adım, ▶ ile otomatik oynatılabilir.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 11 KERNEL & PARAMETRE -->
+<section class="slide" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Kernel ve parametre sayısı</h2>
+  <div class="cols">
+    <div>
+      <ul class="b">
+        <li><b>Kernel:</b> konvolüsyondaki küçük ağırlık matrisi; değerleri elle verilmez, <b>eğitimle öğrenilir</b>.</li>
+        <li>3×3 filtre (gri, 1 kanal): <b>9 ağırlık + 1 bias = 10</b> parametre</li>
+        <li>RGB (3 kanal): 3 × 3 × 3 = <b>27</b> ağırlık (+1 bias)</li>
+      </ul>
+      <div class="formula mt">k_h × k_w × C_giriş + 1</div>
+    </div>
+    <div class="card acc">
+      <h3>Ağırlık paylaşımı <span class="en">(weight sharing)</span></h3>
+      <p>Aynı filtre görüntünün <b>her konumunda</b> kullanılır.</p>
+      <ul class="b small">
+        <li>Parametre sayısı az kalır</li>
+        <li>Özellik görüntünün neresinde olursa olsun yakalanır</li>
+        <li>Filtre her konumda “buradaki bölge benim aradığım örüntüye ne kadar benziyor?” diye ölçer</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Kernel, konvolüsyonda kullanılan küçük ağırlık matrisidir; eğitim sonunda her filtre yatay kenar, dikey kenar, köşe gibi belirli bir örüntüye duyarlı hale gelir.</p>
+    <p>Genel formül: kernel yüksekliği çarpı genişliği çarpı giriş kanal sayısı kadar ağırlık, artı bir bias. Gri girişte 9, RGB girişte 27 ağırlık.</p>
+    <p>Aynı filtre her konumda tekrar kullanıldığı için parametre sayısı küçük kalır; benzerlik yüksekse çıkış değeri büyük olur.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 12 ÇOKLU FİLTRE -->
+<section class="slide" data-anim="multifilter" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Neden birden fazla filtre?</h2>
+  <svg id="mf-svg" width="1680" height="760" viewBox="0 0 1680 760" style="margin-top:-20px"></svg>
+  <div class="card blue" data-show="4" style="position:absolute; left:120px; bottom:110px; width:440px; font-size:28px">
+    <b>N filtre → N özellik haritası</b><br>= N çıkış kanalı (burada 14×14×3)
+  </div>
+  <aside class="notes">
+    <p>Her filtre tek bir örüntü türünü öğrenir. Bir görüntüyü tanımak için aynı anda farklı yönlerde kenarlara, köşelere, dokulara ihtiyaç var.</p>
+    <p>Burada aynı tişört resmine üç farklı filtre uyguladım; çıktılar tarayıcıda gerçekten hesaplanıyor (ReLU uygulanmış). Yatay filtre üst kenarları, dikey filtre sol kenarları, köşe filtresi sol üst köşeleri parlatıyor.</p>
+    <p>N filtre N farklı özellik haritası, yani N kanal üretir; model görüntüyü çok yönlü temsil eder.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 13 POOLING NEDİR -->
+<section class="slide" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Havuzlama <span class="en">(Pooling)</span> nedir?</h2>
+  <p style="max-width:1600px">Özellik haritasını küçük bölgelere ayırıp her bölgeyi <b>tek bir değerle özetler</b> → uzamsal boyut küçülür. <b>Öğrenilebilir parametresi yoktur.</b></p>
+  <div class="cols mt" style="gap:36px">
+    <div class="card"><h3>① Boyutu küçültür</h3>Hesaplama yükü ve sonraki katmanların parametre sayısı azalır</div>
+    <div class="card green"><h3>② En güçlü tepkiyi korur</h3>Her bölgedeki en belirgin özellik tutulur</div>
+    <div class="card"><h3>③ Kaymalara dayanıklılık</h3>Küçük konum kaymalarına karşı <span class="en">translation invariance</span></div>
+    <div class="card"><h3>④ Daha geniş bakış</h3>Sonraki katmanların <span class="en">receptive field</span>'ı büyür</div>
+  </div>
+  <aside class="notes">
+    <p>Pooling, Türkçesiyle havuzlama: özellik haritalarını küçük bölgelere ayırıp her bölgeyi tek bir değerle özetleyerek boyutu küçülten işlem. Öğrenilecek ağırlığı yoktur.</p>
+    <p>Max Pooling'in dört amacı var: boyutu ve hesaplamayı azaltmak, her bölgedeki en güçlü özelliği korumak, küçük kaymalara karşı dayanıklılık sağlamak ve sonraki katmanların görüntünün daha geniş bir alanını görmesini sağlamak.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 14 MAX POOLING -->
+<section class="slide" data-anim="maxpool" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>2×2 Max Pooling <small>(stride = 2)</small></h2>
+  <div class="row center" style="gap:90px; margin-top:10px">
+    <div><div class="glabel c-in">Giriş 4×4</div><div id="mp-in"></div></div>
+    <div style="font-size:60px; color:var(--muted)">→</div>
+    <div><div class="glabel c-out">Çıktı 2×2</div><div id="mp-out"></div></div>
+    <div style="flex:1">
+      <div id="mp-info" style="font-size:32px; min-height:50px">&nbsp;</div>
+      <div data-show="5" class="card acc mt">
+        <div class="mono" style="font-size:30px">4×4 → 2×2</div>
+        <div style="font-size:27px; margin-top:8px">Yükseklik ve genişlik yarıya iner,<br><b>kanal sayısı değişmez.</b></div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Ödevdeki gerçek matris: özellik haritası örtüşmeyen 2×2'lik bloklara ayrılıyor; stride 2 olduğu için pencere ikişer adım kayıyor.</p>
+    <p>Her bloktaki dört değerden en büyüğü seçilip çıkışa yazılıyor, diğer üçü atılıyor: 6, 4, 7 ve 9. Sonuç [[6, 4], [7, 9]].</p>
+    <p>Boyut 4×4'ten 2×2'ye iniyor, kanal sayısı aynı kalıyor. Tek boyutlarda aşağı yuvarlanır; örneğin 11×11 → 5×5 olur.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 15 AKTİVASYON NEDEN -->
+<section class="slide" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Aktivasyon <span class="en">(Activation)</span> fonksiyonları neden gerekli?</h2>
+  <p>Ağa <b>doğrusal olmayanlık</b> <span class="en">(non-linearity)</span> kazandırmak için. Aktivasyon olmasaydı:</p>
+  <div class="card mt" style="padding:36px 44px">
+    <div class="mathline" data-show="1">Katman 1: &nbsp;h = W₁·x + b₁</div>
+    <div class="mathline" data-show="2">Katman 2: &nbsp;y = W₂·h + b₂ = (W₂W₁)·x + (W₂b₁ + b₂)</div>
+    <div class="mathline c-neg" data-show="3" style="font-weight:700">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= W·x + b &nbsp;→ yine tek bir doğrusal katman!</div>
+  </div>
+  <div class="card green mt" data-show="4">
+    Art arda doğrusal dönüşümler tek bir doğrusal dönüşüme indirgenir. Katman sayısı ne olursa olsun ağ, tek katmanlı doğrusal bir modelden <b>güçlü olamaz</b>. Çözüm: <span class="mono">y = f(W·x + b)</span>
+  </div>
+  <aside class="notes">
+    <p>Aktivasyon olmasaydı her katman yalnızca çarpma ve toplama yapardı. İki doğrusal katmanı art arda yazınca, matrisler çarpılıp tek bir W matrisine dönüşüyor.</p>
+    <p>Yani katman sayısı ne olursa olsun ağ tek katmanlı doğrusal bir modelden daha güçlü olamazdı. Her katmandan sonra konan doğrusal olmayan f fonksiyonu bu indirgemeyi engelliyor.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 16 RELU -->
+<section class="slide" data-anim="relu" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>ReLU: <span class="mono">f(x) = max(0, x)</span></h2>
+  <div class="row" style="gap:60px">
+    <svg id="relu-svg" width="940" height="660" viewBox="0 0 940 660"></svg>
+    <div style="flex:1; padding-top:20px">
+      <ul class="b">
+        <li>Negatif → <b class="c-neg">0</b>, pozitif → <b class="c-out">olduğu gibi</b></li>
+        <li>Hesaplaması çok ucuz</li>
+        <li>Pozitif bölgede eğim 1 → <span class="en">vanishing gradient</span> sorununu azaltır</li>
+        <li>Seyrek <span class="en">(sparse)</span> temsil</li>
+      </ul>
+      <div data-show="2" class="mono mt" style="font-size:28px">Giriş: [−5, −2, −1, 0, 2, 4, 6]</div>
+      <div data-show="3" class="mono" style="font-size:28px; margin-top:10px">ReLU:&nbsp; [<span class="c-neg">0, 0, 0</span>, 0, 2, 4, 6]</div>
+      <div class="muted mt" style="font-size:22px">İpucu: fareyi grafiğin üzerinde gezdirin.</div>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>ReLU'nun tek bir görevi var: negatif girişleri 0 yapar, pozitif girişleri olduğu gibi bırakır. Ödevdeki değerler −5, −2, −1 sıfıra iniyor; 2, 4, 6 korunuyor.</p>
+    <p>Avantajları: hesaplaması çok ucuz, pozitif bölgede türevi 1 olduğu için derin ağlarda kaybolan gradyan sorununu azaltıyor ve nöronların bir kısmını sıfırlayarak seyrek bir temsil oluşturuyor.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 17 SOFTMAX -->
+<section class="slide" data-anim="softmax" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Softmax: puanları olasılığa çevirmek</h2>
+  <div class="cols" style="gap:80px">
+    <div>
+      <div class="glabel">Logit değerleri (kaydırın)</div>
+      <div class="sm-row"><label for="sm-z1">z₀ <span class="muted">e=<span id="sm-e1"></span></span></label><input type="range" id="sm-z1" min="-3" max="5" step="0.1" value="2.0"><div class="v" id="sm-v1"></div></div>
+      <div class="sm-row"><label for="sm-z2">z₁ <span class="muted">e=<span id="sm-e2"></span></span></label><input type="range" id="sm-z2" min="-3" max="5" step="0.1" value="1.0"><div class="v" id="sm-v2"></div></div>
+      <div class="sm-row"><label for="sm-z3">z₂ <span class="muted">e=<span id="sm-e3"></span></span></label><input type="range" id="sm-z3" min="-3" max="5" step="0.1" value="0.1"><div class="v" id="sm-v3"></div></div>
+      <div class="formula mt" style="font-size:28px">softmax(zᵢ) = e^zᵢ / Σ e^zⱼ &nbsp;·&nbsp; Σ e^z = <span id="sm-esum"></span></div>
+      <div class="mt"><button type="button" id="sm-reset" style="font-size:22px; padding:10px 20px; border-radius:10px; border:2px solid var(--line); background:#fff; cursor:pointer">↺ Başlangıç: 2.0 / 1.0 / 0.1</button></div>
+    </div>
+    <div>
+      <div class="glabel">Olasılıklar</div>
+      <div class="bar-row"><div class="lab">Sınıf 0</div><div class="track"><div class="fill"></div></div><div class="pct"></div></div>
+      <div class="bar-row"><div class="lab">Sınıf 1</div><div class="track"><div class="fill"></div></div><div class="pct"></div></div>
+      <div class="bar-row"><div class="lab">Sınıf 2</div><div class="track"><div class="fill"></div></div><div class="pct"></div></div>
+      <div class="sm-sum mt" id="sm-sum"></div>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Softmax bir sayı vektörünü, yani logit'leri, olasılık dağılımına çevirir: tüm çıktılar 0 ile 1 arasında ve toplamları 1.</p>
+    <p>Başlangıç değerleri ödevdeki örnek: 2.0, 1.0, 0.1 → 0.659, 0.242, 0.099. Kaydırıcılarla oynayınca toplamın her zaman 1 kaldığını ve en büyük logit'in en büyük olasılığı aldığını görebiliriz.</p>
+    <p>Yeşil çubuk argmax, yani modelin tahmini. Çok sınıflı sınıflandırmada çıkış katmanında kullanılır.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 18 RELU VS SOFTMAX -->
+<section class="slide" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>ReLU ve Softmax farkı</h2>
+  <table class="t" style="font-size:32px">
+    <tr><th style="width:24%"></th><th>ReLU</th><th>Softmax</th></tr>
+    <tr><td><b>Çalışma şekli</b></td><td>Her değeri <b>bağımsız</b> işler</td><td>Vektörün <b>tamamını birlikte</b> işler</td></tr>
+    <tr><td><b>Çıkış aralığı</b></td><td>0 ile sonsuz arası</td><td>0 ile 1 arası, <b>toplam = 1</b></td></tr>
+    <tr><td><b>Kullanım yeri</b></td><td>Gizli katmanlar</td><td>Çıkış katmanı (çok sınıflı)</td></tr>
+    <tr><td><b>Amacı</b></td><td>Doğrusal olmayanlık kazandırmak</td><td>Çıktıyı olasılığa çevirmek</td></tr>
+  </table>
+  <aside class="notes">
+    <p>En önemli fark: ReLU her değere tek tek bakar; bir değerin sonucu diğerlerinden etkilenmez. Softmax ise bütün vektörü birlikte işler: bir logit büyüyünce diğer olasılıklar küçülür.</p>
+    <p>Bu yüzden ReLU gizli katmanlarda doğrusal olmayanlık için, softmax ise yalnızca çıkış katmanında olasılık üretmek için kullanılır.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 19 FLATTEN & DENSE -->
+<section class="slide" data-anim="flatten" data-sec="Bölüm 2 · Temel kavramlar">
+  <h2>Düzleştirme <span class="en">(Flatten)</span> ve tam bağlantılı katman <span class="en">(Dense)</span></h2>
+  <svg id="fl-svg" width="1680" height="680" viewBox="0 0 1680 680" style="margin-top:-10px"></svg>
+  <div data-show="4" class="formula" style="position:absolute; left:120px; top:800px; font-size:30px; text-align:left">
+    Dense(64) parametre:<br>400 × 64 + 64 = <b>25.664</b>
+  </div>
+  <aside class="notes">
+    <p>Flatten, 5×5×16'lık çok boyutlu çıktıyı 400 elemanlık tek boyutlu bir vektöre dizer; parametresi yoktur, sadece şekli değiştirir. Dense katmanlar tek boyutlu giriş beklediği için bu gerekli.</p>
+    <p>Dense katmandaki her nöron önceki katmanın tüm nöronlarına bağlıdır: y = f(W·x + b). Çizgilerin sadece bir kısmını çizdim; gerçekte 400 × 64 bağlantı var.</p>
+    <p>Konvolüsyon “burada bir kenar var” der, Dense katmanlar “bu özelliklerin birleşimi bir ayakkabıdır” der. Son katman 10 nöronla her sınıfa bir puan verir.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 20 BÖLÜM 3 KAPAK -->
+<section class="slide section">
+  <div class="num"><span>Bölüm</span>3</div>
+  <h1>Konvolüsyonun kodlanması</h1>
+  <p class="sub">Conv2D · weights · biases · he_normal</p>
+  <aside class="notes"><p>Şimdi konvolüsyon katmanını Keras ile kurup çıktısını, ağırlıklarını ve bias'larını inceliyorum.</p></aside>
+</section>
+
+<!-- ======================================================= 21 CONV2D KODU -->
+<section class="slide" data-sec="Bölüm 3 · Konvolüsyonun kodlanması">
+  <h2>Conv2D katmanı: kod ve çıktı</h2>
+  <div class="cols w60" style="gap:40px">
+    <div class="codebox"><div class="cap">Kod</div>
+<pre class="code" data-hl="|3-8|10-11|13|14-18">tf.keras.utils.set_random_seed(42)
+
+conv = tf.keras.layers.Conv2D(
+    filters=16,
+    kernel_size=(3, 3),
+    activation='relu',
+    kernel_initializer='he_normal'
+)
+
+dummy_input = tf.random.normal((1, 128, 128, 1))
+output = conv(dummy_input)
+
+weights, biases = conv.get_weights()
+print("Giriş boyutu:", dummy_input.shape)
+print("Çıkış boyutu:", output.shape)
+print("Filtre ağırlıklarının boyutu:", weights.shape)
+print("Bias boyutu:", biases.shape)
+print(weights[:, :, 0, 0])</pre>
+    </div>
+    <div class="codebox"><div class="cap">Gerçek çıktı</div>
+<pre class="out">Giriş boyutu: (1, 128, 128, 1)
+Çıkış boyutu: <span class="o-hi">(1, 126, 126, 16)</span>
+Filtre ağırlıklarının boyutu:
+    <span class="o-hi">(3, 3, 1, 16)</span>
+Bias boyutu: <span class="o-hi">(16,)</span>
+İlk filtre:
+[[-0.2528  0.1286 -0.7579]
+ [-0.2168 -0.1518 -0.7022]
+ [ 0.2304  0.7651 -0.7428]]</pre>
+      <p class="muted" style="font-size:21px; margin-top:8px">İlk filtre değerleri 4 basamağa yuvarlandı.</p>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>16 filtreli, 3×3 kernel'li, ReLU aktivasyonlu ve he_normal başlatmalı bir Conv2D katmanı kurdum; girişi 128×128 boyutunda tek kanallı rastgele bir görüntü.</p>
+    <p>16 filtre, katmanın 16 farklı özellik dedektörü öğreneceği anlamına gelir; her filtre kendi özellik haritasını üretir, bu yüzden çıkışta 16 kanal var. Her filtrenin boyutu 3×3×1, çünkü derinlik giriş kanal sayısına eşit.</p>
+    <p>→ tuşuyla kodun ilgili satırları sırayla vurgulanıyor.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 22 BOYUTLAR 128→126 -->
+<section class="slide" data-anim="dims" data-sec="Bölüm 3 · Konvolüsyonun kodlanması">
+  <h2>Neden <span class="mono">(1, 128, 128, 1) → (1, 126, 126, 16)</span>?</h2>
+  <svg id="dm-svg" width="1300" height="560" viewBox="0 0 1300 560"></svg>
+  <div class="row" data-show="4" style="gap:30px; margin-top:4px">
+    <div class="formula" style="font-size:30px">padding='valid': (128 − 3) / 1 + 1 = <b>126</b></div>
+    <div class="card" style="padding:14px 26px; font-size:27px"><span class="mono">padding='same'</span> olsaydı kenarlara 0 eklenir → <b>128</b> kalırdı</div>
+  </div>
+  <aside class="notes">
+    <p>İki değişiklik var. Uzamsal boyut 128'den 126'ya iniyor: varsayılan padding='valid' olduğu için kenarlara dolgu yapılmıyor, 3×3'lük filtre sadece tamamen görüntünün içine sığdığı konumlarda hesaplanabiliyor. Her kenardan 1 piksel, toplamda 2 piksel kaybediliyor.</p>
+    <p>Kanal sayısı 1'den 16'ya çıkıyor, çünkü her filtre bir çıkış kanalı üretiyor.</p>
+    <p>padding='same' kullanılsaydı kenarlara sıfır eklenir ve çıkış 128×128 kalırdı. Şemadaki 10×10 ızgara 128×128'in küçültülmüş temsili.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 23 WEIGHTS & BIASES -->
+<section class="slide" data-sec="Bölüm 3 · Konvolüsyonun kodlanması">
+  <h2><span class="mono">weights</span> ve <span class="mono">biases</span></h2>
+  <div class="row center" style="justify-content:center; margin-bottom:34px">
+    <div class="dimtag"><div class="d" style="background:var(--filter-soft); color:#9a4d00">3</div><div class="t">kernel yüksekliği</div></div>
+    <div class="dimtag"><div class="d" style="background:var(--filter-soft); color:#9a4d00">3</div><div class="t">kernel genişliği</div></div>
+    <div class="dimtag"><div class="d" style="background:var(--input-soft); color:#4a5263">1</div><div class="t">giriş kanalı</div></div>
+    <div class="dimtag"><div class="d" style="background:var(--output-soft); color:var(--output)">16</div><div class="t">filtre sayısı</div></div>
+    <div style="font-size:44px; margin:0 26px; color:var(--muted)">=</div>
+    <div class="dimtag"><div class="d" style="background:var(--accent-soft); color:var(--accent)">144</div><div class="t">ağırlık</div></div>
+  </div>
+  <div class="cols" style="gap:60px">
+    <div>
+      <div class="glabel">16 adet 3×3 filtre <span class="muted" style="font-weight:400">(<code class="inl">weights[:, :, 0, i]</code> = i. filtre)</span></div>
+      <div class="wgrid" id="wgrid">
+        <div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="k3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+    </div>
+    <div>
+      <ul class="b">
+        <li><code class="inl">biases.shape = (16,)</code> → her filtreye <b>1 bias</b></li>
+        <li>Toplam: 144 + 16 = <b>160 parametre</b></li>
+        <li>Bias, ağırlık gibi <b>paylaşılır</b>: filtre her konuma aynı bias'ı ekler</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>weights'in şekli (3, 3, 1, 16): kernel yüksekliği, kernel genişliği, giriş kanal sayısı ve filtre sayısı. Toplam 3×3×1×16 = 144 ağırlık var.</p>
+    <p>biases'in şekli (16,): her filtre için bir bias. Katmanın toplam parametre sayısı 144 + 16 = 160.</p>
+    <p>Neden her filtreye ayrı bir bias? Bir filtre görüntünün her yerinde aynı örüntüyü aradığı için eşiğinin de her yerde aynı olması mantıklı; bias da ağırlıklar gibi paylaşılıyor.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 24 BIAS -->
+<section class="slide" data-sec="Bölüm 3 · Konvolüsyonun kodlanması">
+  <h2>Bias nedir?</h2>
+  <p style="max-width:1600px">Filtrenin çıktısını kaydırarak <b>hangi güçteki eşleşmelerde aktifleşeceğini</b> belirleyen, öğrenilebilir bir <b>eşik</b> parametresi.</p>
+  <div class="formula mb" style="align-self:flex-start">çıkış = ReLU( Σ (giriş × ağırlık) + <span class="c-filter">b</span> )</div>
+  <div class="cols c3">
+    <div class="card red"><h3 style="color:var(--neg)">b &lt; 0</h3>Zayıf eşleşmeler <b>susturulur</b>; filtre ancak güçlü bir örüntüde tetiklenir.</div>
+    <div class="card"><h3>b = 0</h3>Keras'ta <b>başlangıç değeri</b>; eğitimle öğrenilir.</div>
+    <div class="card blue"><h3 style="color:var(--pos)">b &gt; 0</h3>Filtre <b>kolay tetiklenir</b>; zayıf eşleşmeler de geçer.</div>
+  </div>
+  <p class="mt muted">Filtre başına bir tane → bu katmanda 16 bias.</p>
+  <aside class="notes">
+    <p>Bias, filtrenin hesapladığı toplama eklenen sabit bir terim. En basit hâliyle filtrenin “eşik değeri” gibi düşünülebilir.</p>
+    <p>Negatif bias toplamı aşağı çeker; ReLU'dan sonra zayıf eşleşmeler sıfır olur. Pozitif bias filtrenin daha kolay tetiklenmesini sağlar. Keras'ta varsayılan olarak 0 ile başlar ve eğitimde öğrenilir.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 25 HE_NORMAL -->
+<section class="slide" data-anim="henormal" data-sec="Bölüm 3 · Konvolüsyonun kodlanması">
+  <h2><span class="mono">kernel_initializer='he_normal'</span></h2>
+  <div class="cols w40" style="gap:40px">
+    <div>
+      <ul class="b small" style="font-size:28px">
+        <li><b>Hepsi 0 olamaz:</b> 16 filtre birbirinin aynısı olur, aynı girişe aynı cevabı verir</li>
+        <li><b>Çok büyük olamaz:</b> katmanlar ilerledikçe sinyal patlar</li>
+        <li><b>Çok küçük olamaz:</b> sinyal söner, bir şey öğrenilmez</li>
+      </ul>
+      <div class="formula" style="font-size:28px; margin-top:6px">σ = √(2 / fan_in) = √(2/9) ≈ 0,47</div>
+      <div class="card orange mt" data-show="4" style="font-size:26px; padding:20px 26px">
+        <b>Notebook'ta ölçülen (144 ağırlık):</b><br>ortalama = 0,0172 · std = 0,5193<br>
+        <span class="muted">teorik σ ≈ 0,4714</span>
+      </div>
+    </div>
+    <svg id="hn-svg" width="900" height="468" viewBox="0 0 1000 520"></svg>
+  </div>
+  <aside class="notes">
+    <p>he_normal, ağırlıkların başlangıç değerlerini belirleyen bir yöntem. Ağırlıklar rastgele ama doğru büyüklükte başlatılıyor; böylece sinyal katmanlar boyunca ne patlıyor ne sönüyor.</p>
+    <p>Ağırlıklar ortalaması 0, standart sapması √(2/fan_in) olan kesik (truncated) normal dağılımdan çekilir; Keras ±2σ dışına düşen değerleri atıp yeniden çeker. fan_in burada 3×3×1 = 9, σ ≈ 0,47.</p>
+    <p>Yöntem ReLU için tasarlandı: ReLU negatifleri sıfırladığı için varyans yaklaşık yarıya düşer, formüldeki 2 bunu telafi eder. Ölçtüğüm ortalama 0,017 ve std 0,519; sadece 144 değer olduğu için teoriye yakın ama birebir değil. Turuncu çizgiler ilk filtrenin gerçek 9 ağırlığı.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 26 FİLTRE GÖRSELİ -->
+<section class="slide" data-sec="Bölüm 3 · Konvolüsyonun kodlanması">
+  <h2 style="margin-bottom:20px">16 filtrenin başlangıç ağırlıkları</h2>
+  <div class="row" style="gap:60px">
+    <div class="figure"><img src="assets/bolum3_filtreler.png" alt="16 filtrenin he_normal başlangıç ağırlıkları" style="height:770px"></div>
+    <div style="flex:1; padding-top:30px">
+      <ul class="b">
+        <li><b style="color:#c0392b">Kırmızı</b> = pozitif, <b style="color:#2f5fb3">mavi</b> = negatif ağırlık</li>
+        <li>Rastgele başlatıldıkları için <b>belirli bir örüntü yok</b>, gürültü gibi</li>
+        <li>Eğitimle güncellenip <b>anlamlı özellik dedektörlerine</b> dönüşürler</li>
+        <li>Ölçülen ortalama / std, he_normal'in teorik değerleriyle uyumlu</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Bu görseli ödevde ek olarak çizdirdim: 16 filtrenin he_normal ile başlatılmış 3×3 ağırlıkları, aynı renk ölçeğinde.</p>
+    <p>Ağırlıklar rastgele olduğu için filtreler henüz bir kenar ya da köşe aramıyor, gürültü gibi görünüyor. Eğitim sırasında veriye göre güncellenerek anlamlı özellik dedektörlerine dönüşecekler.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 27 BÖLÜM 4 KAPAK -->
+<section class="slide section">
+  <div class="num"><span>Bölüm</span>4</div>
+  <h1>Pooling'in incelenmesi</h1>
+  <p class="sub">MaxPooling2D · elle hesap · boyutlar</p>
+  <aside class="notes"><p>Bu bölümde 2. bölümde elle yaptığım max pooling hesabını Keras ile doğruluyorum.</p></aside>
+</section>
+
+<!-- ======================================================= 28 MAXPOOL KODU -->
+<section class="slide" data-sec="Bölüm 4 · Pooling">
+  <h2>MaxPooling2D: kod ve çıktı</h2>
+  <div class="cols w60" style="gap:40px">
+    <div class="codebox"><div class="cap">Kod</div>
+<pre class="code" data-hl="|1-6|8|10-13|15">input_data = tf.constant([
+    [[1., 3., 2., 4.],
+     [5., 6., 1., 2.],
+     [7., 2., 8., 3.],
+     [4., 1., 5., 9.]]
+])
+
+input_data = tf.reshape(input_data, (1, 4, 4, 1))
+
+pool = tf.keras.layers.MaxPooling2D(
+    pool_size=(2, 2),
+    strides=2
+)
+
+output = pool(input_data)</pre>
+    </div>
+    <div class="codebox"><div class="cap">Gerçek çıktı</div>
+<pre class="out">Giriş:
+[[1. 3. 2. 4.]
+ [5. 6. 1. 2.]
+ [7. 2. 8. 3.]
+ [4. 1. 5. 9.]]
+Pooling sonucu:
+<span class="o-hi">[[6. 4.]
+ [7. 9.]]</span></pre>
+      <div class="card acc mt" style="font-size:26px; padding:20px 26px">
+        <code class="inl">tf.reshape → (1, 4, 4, 1)</code><br>Keras <b>(görüntü sayısı, satır, sütun, kanal)</b> bekler. Sayılar değişmez, sadece şekil.
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Giriş tek kanallı 4×4'lük bir matris. Keras katmanları veriyi (batch, yükseklik, genişlik, kanal) biçiminde beklediği için tf.reshape ile (1, 4, 4, 1) şekline getirildi: 1 görüntü, 4 satır, 4 sütun, 1 kanal.</p>
+    <p>pool_size (2, 2) ve strides 2 olduğu için pencere örtüşmeden ikişer adım kayıyor. Çıktı [[6, 4], [7, 9]].</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 29 ELLE HESAP -->
+<section class="slide" data-sec="Bölüm 4 · Pooling">
+  <h2>Elle hesap ve program karşılaştırması</h2>
+  <div class="cols w60">
+    <table class="t" style="font-size:32px">
+      <tr><th>Bölge</th><th>Değerler</th><th class="num">En büyük</th></tr>
+      <tr><td>Sol üst</td><td class="mono">1, 3, 5, 6</td><td class="num best">6</td></tr>
+      <tr><td>Sağ üst</td><td class="mono">2, 4, 1, 2</td><td class="num best">4</td></tr>
+      <tr><td>Sol alt</td><td class="mono">7, 2, 4, 1</td><td class="num best">7</td></tr>
+      <tr><td>Sağ alt</td><td class="mono">8, 3, 5, 9</td><td class="num best">9</td></tr>
+    </table>
+    <div>
+      <div class="row center" style="gap:30px">
+        <div class="card"><div class="glabel">Elle</div><div class="mono" style="font-size:40px; line-height:1.3">6 &nbsp;4<br>7 &nbsp;9</div></div>
+        <div style="font-size:54px; color:var(--max); font-weight:800">=</div>
+        <div class="card"><div class="glabel">Program</div><div class="mono" style="font-size:40px; line-height:1.3">6 &nbsp;4<br>7 &nbsp;9</div></div>
+      </div>
+      <p class="mt"><b class="c-max">Birebir aynı.</b> MaxPooling2D her 2×2 bloktan yalnızca en büyük değeri seçip diğerlerini atıyor.</p>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Matris örtüşmeyen dört adet 2×2 bloğa ayrılıyor; her bloğun en büyüğü 6, 4, 7 ve 9.</p>
+    <p>Programın ürettiği çıktı elle hesapladığım sonuçla birebir aynı. Bu, MaxPooling2D katmanının her bloktan yalnızca en büyük değeri seçtiğini ve diğer değerleri attığını doğruluyor.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 30 BOYUT & AVANTAJ -->
+<section class="slide" data-sec="Bölüm 4 · Pooling">
+  <h2>Boyutlar ve Max Pooling'in avantajları</h2>
+  <div class="cols w40" style="gap:60px">
+    <div>
+      <div class="mono" style="font-size:40px; font-weight:700"><span class="c-in">(1, 4, 4, 1)</span> → <span class="c-out">(1, 2, 2, 1)</span></div>
+      <div class="formula mt" style="font-size:30px">(4 − 2) / 2 + 1 = 2</div>
+      <ul class="b mt">
+        <li>Batch ve kanal <b>değişmez</b></li>
+        <li>16 eleman → 4 eleman: <b>%75 azalma</b></li>
+      </ul>
+    </div>
+    <div>
+      <ul class="b small" style="font-size:29px">
+        <li><b>Boyut ve hesaplama azalır:</b> sonraki katmanların işleyeceği veri 4 kat az</li>
+        <li><b>En güçlü özellik korunur:</b> her bölgedeki en belirgin aktivasyon</li>
+        <li><b>Küçük kaymalara dayanıklılık</b> <span class="en">(translation invariance)</span></li>
+        <li><b>Daha geniş algılama alanı</b> <span class="en">(receptive field)</span></li>
+        <li><b>Parametre eklemez:</b> modeli büyütmez, overfitting riskini artırmaz</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Giriş (1, 4, 4, 1), çıkış (1, 2, 2, 1). Konvolüsyondaki formülün aynısı: (giriş − pool_size) / stride + 1 = 2. Batch ve kanal değişmedi; eleman sayısı 16'dan 4'e, yani %75 azaldı.</p>
+    <p>Avantajlar: veri 4 kat azaldığı için hesaplama ve maliyet düşer; en belirgin özellik tutulur; bir özellik bölge içinde bir piksel kaysa bile maksimum genellikle değişmez; sonraki konvolüsyonlar görüntünün daha büyük bölgesini görür; ve öğrenilecek ağırlığı olmadığı için modeli büyütmez.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 31 BÖLÜM 5 KAPAK -->
+<section class="slide section">
+  <div class="num"><span>Bölüm</span>5</div>
+  <h1>ReLU ve Softmax'ın incelenmesi</h1>
+  <p class="sub">Kod çıktıları ve soruların cevapları</p>
+  <aside class="notes"><p>Aktivasyon fonksiyonlarını Keras katmanlarıyla çalıştırıp çıktılarını yorumluyorum.</p></aside>
+</section>
+
+<!-- ======================================================= 32 RELU KODU -->
+<section class="slide" data-sec="Bölüm 5 · ReLU ve Softmax">
+  <h2>ReLU: kod, çıktı ve sorular</h2>
+  <div class="cols" style="gap:50px">
+    <div>
+      <div class="codebox"><div class="cap">Kod</div>
+<pre class="code">x = tf.constant([-5., -2., -1., 0., 2., 4., 6.])
+relu = tf.keras.layers.ReLU()
+y = relu(x)</pre></div>
+      <div class="codebox mt"><div class="cap">Gerçek çıktı</div>
+<pre class="out">Giriş: [-5. -2. -1.  0.  2.  4.  6.]
+ReLU çıkışı: <span class="o-hi">[0. 0. 0. 0. 2. 4. 6.]</span></pre></div>
+    </div>
+    <div class="qa">
+      <div class="q"><div class="k">1</div><div><h4>Negatifler neden 0?</h4><p>max(0, x): x negatifse büyük olan 0. Nöron “kapalı” → aradığı özellik burada yok.</p></div></div>
+      <div class="q"><div class="k">2</div><div><h4>Pozitifler neden korunur?</h4><p>Özelliğin gücü kaybolmaz (6 &gt; 2). Eğim 1 → gradyan küçülmeden geçer.</p></div></div>
+      <div class="q"><div class="k">3</div><div><h4>ReLU olmasaydı?</h4><p>Aktivasyon yok → model doğrusal kalırdı. Sigmoid / tanh → <span class="en">vanishing gradient</span>, daha pahalı hesap.</p></div></div>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>ReLU'nun kuralı max(0, x): x negatifse büyük olan 0 olduğu için −5, −2, −1 sıfıra döndü; 0 da 0 kaldı. Anlamı: nöronun değeri negatifse aradığı özellik o bölgede yok ve nöron kapalı kalıyor; bu, modeli sade ve verimli yapar.</p>
+    <p>Pozitifse x'in kendisi geçer; böylece özelliğin ne kadar güçlü bulunduğu bilgisi kaybolmaz ve bu bölgede eğim 1 olduğu için hata sinyali küçülmeden geriye taşınır.</p>
+    <p>Hiç aktivasyon olmasaydı art arda doğrusal işlemler tek bir doğrusal işleme eşit olurdu. Sigmoid veya tanh kullanılsaydı model öğrenebilirdi ama bu fonksiyonlar uçlarda düzleşir, gradyan katman katman kaybolur ve eğitim yavaşlar.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 33 SOFTMAX KODU -->
+<section class="slide" data-sec="Bölüm 5 · ReLU ve Softmax">
+  <h2>Softmax: kod, çıktı ve elle hesap</h2>
+  <div class="cols" style="gap:50px">
+    <div>
+      <div class="codebox"><div class="cap">Kod</div>
+<pre class="code">logits = tf.constant([[2.0, 1.0, 0.1]])
+softmax = tf.keras.layers.Softmax()
+probabilities = softmax(logits)
+print(tf.reduce_sum(probabilities).numpy())</pre></div>
+      <div class="codebox mt"><div class="cap">Gerçek çıktı</div>
+<pre class="out"><span class="o-hi">[[0.6590011  0.24243298 0.09856588]]</span>
+Olasılıkların toplamı:
+0.99999994</pre></div>
+      <p class="muted" style="font-size:22px; margin-top:8px">0.99999994: kayan nokta yuvarlaması; matematiksel olarak 1.</p>
+    </div>
+    <div>
+      <table class="t" style="font-size:28px">
+        <tr><th>z</th><th class="num">eᶻ</th><th class="num">eᶻ / Σ</th></tr>
+        <tr><td class="mono">2.0</td><td class="num">≈ 7.389</td><td class="num best">≈ 0.659</td></tr>
+        <tr><td class="mono">1.0</td><td class="num">≈ 2.718</td><td class="num">≈ 0.242</td></tr>
+        <tr><td class="mono">0.1</td><td class="num">≈ 1.105</td><td class="num">≈ 0.099</td></tr>
+        <tr class="total"><td>Σ</td><td class="num">≈ 11.212</td><td class="num">1</td></tr>
+      </table>
+      <ul class="b small mt">
+        <li><b>Toplam neden 1?</b> Her parça bütüne bölünür; pastanın dilimleri gibi.</li>
+        <li><b>Tahmin:</b> argmax([0.659, 0.242, 0.099]) = <b>0</b></li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Softmax, son katmandaki ham puanları olasılıklara çevirir. Çıktı yaklaşık 0. sınıf %65,9, 1. sınıf %24,2, 2. sınıf %9,9.</p>
+    <p>Sıralama korundu ama farklar büyüdü: 2.0 ile 1.0 arasındaki 1 puanlık fark olasılıkta yaklaşık 2,7 katlık farka dönüştü. Her değer bütün değerlerin toplamına bölündüğü için toplam her zaman 1; e üzeri her sayı pozitif olduğu için değerler 0 ile 1 arasında.</p>
+    <p>En yüksek olasılıklı sınıf argmax ile bulunur: en büyük değer kaçıncı sırada? Burada 0. sınıf.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 34 BÖLÜM 6 KAPAK -->
+<section class="slide section">
+  <div class="num"><span>Bölüm</span>6</div>
+  <h1>CNN modeli</h1>
+  <p class="sub">Fashion-MNIST · mimari · eğitim · sonuçlar</p>
+  <aside class="notes"><p>Şimdi öğrendiğimiz bütün parçaları birleştirip gerçek bir veri seti üzerinde küçük bir CNN eğitiyorum.</p></aside>
+</section>
+
+<!-- ======================================================= 35 FASHION-MNIST -->
+<section class="slide" data-sec="Bölüm 6 · CNN modeli">
+  <h2>Veri seti: Fashion-MNIST</h2>
+  <div class="figure mb"><img src="assets/fashion_mnist_ornekler.png" alt="Her sınıftan bir örnek" style="width:1680px"><div class="capt">Her sınıftan bir örnek (notebook çıktısı)</div></div>
+  <div class="cols" style="gap:50px">
+    <ul class="b small" style="font-size:28px">
+      <li><b>70.000</b> gri resim, <b>28×28</b>, <b>10 sınıf</b></li>
+      <li><b>60.000</b> eğitim / <b>10.000</b> test</li>
+      <li><b>Normalizasyon:</b> 0–255 → 0–1 (hızlı, kararlı öğrenme)</li>
+      <li><b>Kanal ekleme:</b> <code class="inl">(60000, 28, 28) → (60000, 28, 28, 1)</code></li>
+    </ul>
+    <div class="codebox">
+<pre class="code" style="font-size:22px">x_train = x_train.astype("float32") / 255.0
+x_test = x_test.astype("float32") / 255.0
+
+x_train = x_train[..., np.newaxis]
+x_test = x_test[..., np.newaxis]</pre>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Fashion-MNIST Keras içinde hazır geliyor: 10 giysi sınıfı (T-shirt/top, Trouser, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, Ankle boot), 60.000 eğitim ve 10.000 test resmi.</p>
+    <p>Piksel değerleri 255'e bölünerek 0–1 arasına çekildi; küçük ve aynı ölçekteki sayılarla model daha hızlı ve kararlı öğrenir.</p>
+    <p>Conv2D (görüntü sayısı, satır, sütun, kanal) beklediği için np.newaxis ile sona kanal boyutu eklendi: 60.000 görüntü, 28×28, 1 kanal.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 36 MİMARİ -->
+<section class="slide" data-anim="arch" data-sec="Bölüm 6 · CNN modeli">
+  <h2>Mimari: veri katmanlardan geçerken</h2>
+  <svg id="ar-svg" width="1680" height="540" viewBox="0 0 1680 540" style="margin-top:20px"></svg>
+  <div data-show="9" class="row center" style="gap:30px; margin-top:10px">
+    <div class="formula" style="font-size:32px">Toplam: <b>27.562</b> parametre</div>
+    <div class="muted" style="font-size:26px">Resim küçülür (28 → 5), kanal artar (1 → 16)</div>
+  </div>
+  <aside class="notes">
+    <p>28×28×1'lik resim önce 8 filtreli konvolüsyondan geçiyor: 26×26×8, basit özellikler. Pooling ile 13×13×8'e küçülüyor.</p>
+    <p>İkinci konvolüsyon 16 karmaşık özellik arıyor: 11×11×16; pooling ile 5×5×16. Flatten bunu 400 değerlik tek sıraya diziyor, Dense(64) özellikleri birleştiriyor, Dense(10) ve softmax her sınıfa bir olasılık veriyor.</p>
+    <p>Bloklarda yüzey resmin boyutunu, derinlik kanal sayısını gösteriyor. → ile katman katman ilerleyebilirim.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 37 KATMAN TABLOSU -->
+<section class="slide" data-sec="Bölüm 6 · CNN modeli">
+  <h2>Katman katman boyut ve parametre</h2>
+  <table class="t" style="font-size:28px">
+    <tr><th>Katman</th><th>Çıkış boyutu</th><th class="num">Parametre</th><th>Hesap</th></tr>
+    <tr><td>Conv2D (8 filtre, 3×3)</td><td class="mono">26×26×8</td><td class="num">80</td><td class="mono">8 × (3·3·1) + 8</td></tr>
+    <tr><td>MaxPooling2D (2×2)</td><td class="mono">13×13×8</td><td class="num">0</td><td>–</td></tr>
+    <tr><td>Conv2D (16 filtre, 3×3)</td><td class="mono">11×11×16</td><td class="num">1.168</td><td class="mono">16 × (3·3·8) + 16</td></tr>
+    <tr><td>MaxPooling2D (2×2)</td><td class="mono">5×5×16</td><td class="num">0</td><td>11 / 2 → 5 (aşağı yuvarlama)</td></tr>
+    <tr><td>Flatten</td><td class="mono">400</td><td class="num">0</td><td class="mono">5 × 5 × 16</td></tr>
+    <tr><td>Dense (64, ReLU)</td><td class="mono">64</td><td class="num">25.664</td><td class="mono">400 × 64 + 64</td></tr>
+    <tr><td>Dense (10, softmax)</td><td class="mono">10</td><td class="num">650</td><td class="mono">64 × 10 + 10</td></tr>
+    <tr class="total"><td>Toplam</td><td></td><td class="num">27.562</td><td>model.summary() ile aynı</td></tr>
+  </table>
+  <p class="mt muted" style="font-size:26px">Her filtrenin ağırlık sayısı × filtre sayısı + her filtre için 1 bias. İkinci Conv'un her filtresi önceki <b>8 kanalın hepsine</b> bakar.</p>
+  <aside class="notes">
+    <p>Tablodaki değerler model.summary() çıktısıyla birebir aynı: toplam 27.562 parametre, hepsi eğitilebilir.</p>
+    <p>Dikkat edilmesi gereken yer ikinci konvolüsyon: her filtre 3×3 ama 8 kanalın tamamına baktığı için filtre başına 72 ağırlık var; 16 × 72 + 16 = 1.168.</p>
+    <p>Pooling ve Flatten katmanlarının parametresi yok; sadece veriyi küçültüyor veya şeklini değiştiriyorlar.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 38 EĞİTİM AYARLARI -->
+<section class="slide" data-sec="Bölüm 6 · CNN modeli">
+  <h2>Eğitim ayarları <small>— ders çalışma benzetmesi</small></h2>
+  <table class="t" style="font-size:27px">
+    <tr><th style="width:34%">Ayar</th><th>Ne yapar?</th><th style="width:28%">Benzetme</th></tr>
+    <tr><td class="mono">optimizer='adam'</td><td>Ağırlıkları hatayı azaltacak yönde günceller</td><td>Çalışma yöntemi</td></tr>
+    <tr><td class="mono">loss='sparse_categorical_crossentropy'</td><td>Hatayı ölçer; etiketler tam sayı (0–9)</td><td>Yanlışların puanı</td></tr>
+    <tr><td class="mono">metrics=['accuracy']</td><td>Doğru tahmin oranı</td><td>Karnedeki not</td></tr>
+    <tr><td class="mono">epochs=5</td><td>Tüm eğitim verisi 5 kez dolaşılır</td><td>Kitabı 5 kez okumak</td></tr>
+    <tr><td class="mono">batch_size=64</td><td>64 resimden sonra ağırlıklar güncellenir (844 adım/epoch)</td><td>64 soruda bir cevaplara bakmak</td></tr>
+    <tr><td class="mono">validation_split=0.1</td><td>Eğitim verisinin %10'u (6.000) ayrılır</td><td>Deneme sınavı</td></tr>
+  </table>
+  <p class="mt muted" style="font-size:26px">Test verisi (10.000) eğitimde hiç görülmez → <b>gerçek sınav</b>.</p>
+  <aside class="notes">
+    <p>Adam optimizer, öğrencinin çalışma yöntemi gibi: hatadan yola çıkıp ağırlıkları düzeltiyor. sparse_categorical_crossentropy kayıp fonksiyonu yanlışların ne kadar kötü olduğunu ölçüyor; sparse, etiketlerin 0–9 arası tam sayı olmasından geliyor.</p>
+    <p>5 epoch, kitabı baştan sona 5 kez okumak gibi. Batch 64: her 64 resimde bir ağırlıklar güncelleniyor; 54.000 eğitim resmi / 64 ≈ 844 adım, çıktıdaki 844/844 bunu gösteriyor.</p>
+    <p>validation_split=0.1 eğitim verisinin %10'unu deneme sınavı olarak ayırıyor; test verisi ise eğitimden sonra yapılan gerçek sınav.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 39 SONUÇLAR -->
+<section class="slide" data-sec="Bölüm 6 · CNN modeli">
+  <h2>Sonuçlar <small>(5. epoch sonunda)</small></h2>
+  <div class="kpis">
+    <div class="kpi"><div class="v">0,8819</div><div class="l">Eğitim doğruluğu</div></div>
+    <div class="kpi"><div class="v">0,8728</div><div class="l">Doğrulama doğruluğu</div></div>
+    <div class="kpi main"><div class="v">0,8691</div><div class="l">Test doğruluğu</div></div>
+    <div class="kpi"><div class="v">0,3645</div><div class="l">Test kaybı (loss)</div></div>
+  </div>
+  <div class="card acc mt2" style="font-size:36px; text-align:center">
+    Hiç görmediği <b>10.000</b> test resminin yaklaşık <b>8.691</b>'ini doğru sınıflandırdı.
+  </div>
+  <p class="mt muted center">Eğitim − test farkı ≈ 1,3 puan → ezberleme yok.</p>
+  <aside class="notes">
+    <p>Son epoch'ta eğitim doğruluğu %88,19, doğrulama doğruluğu %87,28. Test verisinde %86,91 doğruluk ve 0,3645 kayıp.</p>
+    <p>Yani model eğitim sırasında hiç görmediği 10.000 giysi resminin yaklaşık 8.691'ini doğru sınıflandırdı. Eğitim ile test arasındaki fark yaklaşık 1,3 puan; bu küçük fark modelin öğrendiğini genelleyebildiğini gösteriyor.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 40 EĞİTİM GRAFİKLERİ -->
+<section class="slide" data-sec="Bölüm 6 · CNN modeli">
+  <h2 style="margin-bottom:20px">Eğitim grafikleri</h2>
+  <div class="figure"><img src="assets/bolum6_egitim_grafikleri.png" alt="Accuracy ve loss eğrileri" style="width:1500px"></div>
+  <div class="cols c3 mt" style="font-size:28px">
+    <div class="card blue center">Accuracy her epoch <b>artıyor</b></div>
+    <div class="card blue center">Loss her epoch <b>azalıyor</b></div>
+    <div class="card green center">Eğitim ve doğrulama eğrileri <b>yakın</b> → overfitting yok</div>
+  </div>
+  <aside class="notes">
+    <p>Grafiklerde eğitim ve doğrulama doğruluğu her epoch'ta artmış, kayıp ise azalmış.</p>
+    <p>İki eğrinin birbirine yakın gitmesi önemli: model eğitim verisini ezberlemiyor, yani aşırı öğrenme (overfitting) yok. Doğrulama kaybı da hâlâ düşüyor; daha fazla epoch ile biraz daha iyileşebilirdi.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 41 BÖLÜM 7 KAPAK -->
+<section class="slide section">
+  <div class="num"><span>Bölüm</span>7</div>
+  <h1>Model mimarisinin anlaşılması</h1>
+  <p class="sub">Ödevdeki 10 soru</p>
+  <aside class="notes"><p>Bu bölümde ödevdeki 10 soruyu üç slaytta cevaplıyorum.</p></aside>
+</section>
+
+<!-- ======================================================= 42 SORU 1-3 -->
+<section class="slide" data-sec="Bölüm 7 · Mimari soruları">
+  <h2>Sorular 1–3: konvolüsyon katmanları</h2>
+  <div class="qa">
+    <div class="q"><div class="k">1</div><div><h4>Kaç konvolüsyon katmanı var?</h4><p><b>İki:</b> 8 filtreli ve 16 filtreli Conv2D.</p></div></div>
+    <div class="q"><div class="k">2</div><div><h4>İlk katmanda neden 8 filtre?</h4><p>Ham piksellerden kenar, köşe, çizgi gibi <b>basit</b> özellikler öğrenir; çeşitleri az. Fashion-MNIST küçük ve basit. Kesin kural değil, denemeyle ayarlanır.</p></div></div>
+    <div class="q"><div class="k">3</div><div><h4>İkinci katmanda neden 16 filtre?</h4><p>Basit özellikleri birleştirip doku, yaka, topuk gibi <b>karmaşık</b> özellikler öğrenir; çeşitleri fazla. Pooling resmi küçülttüğü için (26 → 13) daha ucuz. <b>Resim küçülürken filtre sayısı artar</b> (8 → 16): yaygın tasarım kalıbı.</p></div></div>
+  </div>
+  <aside class="notes">
+    <p>Modelde iki konvolüsyon katmanı var.</p>
+    <p>İlk katman ham piksellere bakıyor; basit özelliklerin çeşidi az olduğu için 8 filtre yeterli ve modeli küçük ve hızlı tutuyor. Bu sayı tasarımcının seçtiği bir değer; 8. bölümde değiştirince ne olduğunu ölçtüm.</p>
+    <p>İkinci katman karmaşık özellikler öğreniyor ve pooling sonrası resim küçük olduğu için daha fazla filtre kullanmak ucuz. İlerledikçe filtre sayısını artırmak CNN'lerde yaygın bir kalıp.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 43 SORU 4-6 -->
+<section class="slide" data-sec="Bölüm 7 · Mimari soruları">
+  <h2>Sorular 4–6: boyutlar ve pooling</h2>
+  <div class="qa">
+    <div class="q"><div class="k">4</div><div><h4>Boyutlar nasıl değişti?</h4><p class="mono" style="font-size:26px">28×28×1 → 26×26×8 → 13×13×8 → 11×11×16 → 5×5×16</p><p>Her 3×3 conv (valid) −2, her pooling ÷2. 11 tek → <b>aşağı yuvarlama</b>.</p></div></div>
+    <div class="q"><div class="k">5</div><div><h4>Pooling ne katkı sağladı?</h4>
+      <table class="t" style="font-size:26px; width:auto; margin-top:6px">
+        <tr><th></th><th class="num">Flatten</th><th class="num">Dense(64) parametre</th></tr>
+        <tr><td>Pooling ile</td><td class="num">400</td><td class="num best">25.664</td></tr>
+        <tr><td>Pooling olmadan</td><td class="num">24×24×16 = 9.216</td><td class="num c-neg">589.888</td></tr>
+      </table>
+      <p style="margin-top:8px">≈ <b>23 kat</b> daha az parametre → hızlı eğitim, düşük ezberleme riski.</p></div></div>
+    <div class="q"><div class="k">6</div><div><h4>Flatten çıktısı kaç elemanlı?</h4><p>5 × 5 × 16 = <b>400</b></p></div></div>
+  </div>
+  <aside class="notes">
+    <p>Dolgu olmadığı için her 3×3 konvolüsyon yükseklik ve genişliği 2 azaltıyor, kanal sayısını filtre sayısına eşitliyor; her pooling boyutu yarıya indiriyor. 11 tek sayı olduğu için ikinci pooling'de son satır ve sütun kullanılmadı.</p>
+    <p>Pooling'in en büyük etkisi Dense katmanda: pooling olmasaydı Flatten 9.216 eleman verirdi ve Dense(64) 589.888 parametreye çıkardı; pooling bunu yaklaşık 23 kat azalttı.</p>
+    <p>Flatten 5×5 boyutundaki 16 özellik haritasını 400 elemanlık tek sıralı bir listeye diziyor.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 44 SORU 7-10 -->
+<section class="slide" data-sec="Bölüm 7 · Mimari soruları">
+  <h2>Sorular 7–10: Dense, çıkış ve metrik</h2>
+  <div class="qa">
+    <div class="q"><div class="k">7</div><div><h4>Dense(64)'teki 64 nedir?</h4><p>Nöron sayısı. Her nöron 400 değerin tamamına bağlı; 400 → 64 özet bilgi. Parametrelerin <b>≈ %93</b>'ü burada (25.664 / 27.562).</p></div></div>
+    <div class="q"><div class="k">8</div><div><h4>Son katmanda neden 10 nöron?</h4><p>Fashion-MNIST'te <b>10 sınıf</b> var; her nöron bir sınıfın puanı.</p></div></div>
+    <div class="q"><div class="k">9</div><div><h4>Softmax'taki en yüksek değer?</h4><p><b>Sırası</b> (argmax) → tahmin edilen sınıf; <b>kendisi</b> → modelin güveni. Örn. 9. sırada 0,95 → “%95 Ankle boot”.</p></div></div>
+    <div class="q"><div class="k">10</div><div><h4>Başarı hangi metrikle ölçüldü?</h4><p><b>Accuracy</b> = doğru tahmin / toplam tahmin → test: %86,91. Yanında loss da izlendi: 0,3645.</p></div></div>
+  </div>
+  <aside class="notes">
+    <p>64, Dense katmandaki nöron sayısı; her nöron 400 özelliğin farklı bir birleşimini öğreniyor. Modelin en ağır kısmı burası: parametrelerin yaklaşık %93'ü.</p>
+    <p>10 sınıf olduğu için son katmanda 10 nöron var; softmax bu 10 puanı toplamı 1 olan olasılıklara çeviriyor. En yüksek değerin sırası tahmini, kendisi güveni veriyor.</p>
+    <p>Başarıyı accuracy ile ölçtüm: eğitim sırasında eğitim ve doğrulama için, sonra model.evaluate ile test için. Test doğruluğu %86,91, test kaybı 0,3645.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 45 BÖLÜM 8 KAPAK -->
+<section class="slide section">
+  <div class="num"><span>Bölüm</span>8</div>
+  <h1>Filtre sayısı deneyi</h1>
+  <p class="sub">İlk konvolüsyon katmanında 8 filtre ve 16 filtre</p>
+  <aside class="notes"><p>Son bölümde tek bir hiperparametreyi değiştirip etkisini ölçtüm.</p></aside>
+</section>
+
+<!-- ======================================================= 46 DENEY DÜZENİ -->
+<section class="slide" data-sec="Bölüm 8 · Filtre sayısı deneyi">
+  <h2>Deney düzeni</h2>
+  <div class="cols w40" style="gap:50px">
+    <div>
+      <ul class="b">
+        <li>Değişen <b>tek şey</b>: ilk Conv2D'nin filtre sayısı → <b>8</b> ve <b>16</b></li>
+        <li>Aynı kalanlar: mimari, optimizer, epoch, batch, doğrulama oranı</li>
+        <li>İki deneyde de <code class="inl">seed=42</code> ve <code class="inl">clear_session()</code></li>
+        <li>Süre <code class="inl">time.perf_counter()</code> ile ölçüldü</li>
+      </ul>
+    </div>
+    <div class="codebox">
+<pre class="code" data-hl="|1-3|5|7-9" style="font-size:22px">def run_experiment(first_filters, seed=42):
+    tf.keras.backend.clear_session()
+    tf.keras.utils.set_random_seed(seed)
+
+    m = build_model(first_filters)
+    ...
+    start = time.perf_counter()
+    h = m.fit(x_train, y_train, epochs=5, ...)
+    elapsed = time.perf_counter() - start
+
+for f in (8, 16):
+    results.append(run_experiment(f))</pre>
+    </div>
+  </div>
+  <aside class="notes">
+    <p>Aynı model iki farklı ayarla eğitildi. Yalnızca ilk konvolüsyon katmanının filtre sayısı değiştirildi; diğer her şey ve rastgelelik tohumu aynı tutuldu.</p>
+    <p>Her deneyden önce önceki modelden kalanlar temizlendi ve seed 42'ye ayarlandı, böylece iki deney aynı başlangıç koşullarıyla başladı. Eğitim süresi fit çağrısı etrafında ölçüldü.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 47 SONUÇ TABLOSU + GRAFİK -->
+<section class="slide barchart" data-anim="bars" data-sec="Bölüm 8 · Filtre sayısı deneyi">
+  <h2>Sonuçlar: 8 filtre ve 16 filtre</h2>
+  <div class="row" style="gap:50px">
+    <table class="t" style="font-size:27px; width:720px">
+      <tr><th>Ölçüt</th><th class="num">8 filtre</th><th class="num">16 filtre</th></tr>
+      <tr><td>Parametre</td><td class="num">27.562</td><td class="num">28.794</td></tr>
+      <tr><td>Eğitim doğ.</td><td class="num">0,8819</td><td class="num best">0,8868</td></tr>
+      <tr><td>Doğrulama doğ.</td><td class="num">0,8728</td><td class="num best">0,8778</td></tr>
+      <tr><td>Test doğ.</td><td class="num">0,8691</td><td class="num best">0,8744</td></tr>
+      <tr><td>Süre (sn)</td><td class="num best">11,4</td><td class="num">15,7</td></tr>
+      <tr><td>Eğitim − test</td><td class="num">0,0128</td><td class="num">0,0124</td></tr>
+    </table>
+    <svg id="bc-svg" width="880" height="516" viewBox="0 0 920 540"></svg>
+  </div>
+  <p class="muted" style="font-size:22px; margin-top:6px">Süreler CPU'da ölçüldü, donanıma göre değişir. Doğruluk ekseni 0'dan başlıyor: fark gerçekten küçük.</p>
+  <aside class="notes">
+    <p>Tablodaki değerler notebook'taki sonuç tablosundan. 16 filtreli model her doğruluk ölçüsünde biraz daha iyi; ama eğitim süresi belirgin şekilde uzun.</p>
+    <p>Grafikte doğruluk ekseni sıfırdan başlıyor, bu yüzden çubuklar neredeyse aynı boyda: fark gerçekten yarım puan. Süre farkı ise gözle açıkça görülüyor.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 48 EĞRİLER -->
+<section class="slide" data-sec="Bölüm 8 · Filtre sayısı deneyi">
+  <h2 style="margin-bottom:20px">İki deneyin eğitim eğrileri</h2>
+  <div class="figure"><img src="assets/bolum8_deney_karsilastirma.png" alt="8 ve 16 filtre deneylerinin accuracy ve loss eğrileri" style="width:1560px"></div>
+  <p class="mt center">16 filtreli model neredeyse her epoch'ta <b>biraz daha yüksek doğruluk</b> ve <b>biraz daha düşük kayıp</b> gösteriyor.</p>
+  <aside class="notes">
+    <p>Düz çizgiler eğitim, kesikli çizgiler doğrulama. 16 filtreli model neredeyse her epoch'ta biraz önde.</p>
+    <p>Daha fazla filtre ilk katmanda daha çeşitli basit özellik, yani farklı yönlerde kenar ve köşe yakalanmasını sağladı. İki modelde de eğitim ve doğrulama eğrileri birbirine yakın.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 49 YORUM -->
+<section class="slide" data-sec="Bölüm 8 · Filtre sayısı deneyi">
+  <h2>Yorum: kazanç ve maliyet</h2>
+  <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi"><div class="v" style="color:var(--max)">+0,53</div><div class="l">puan test doğruluğu<br>(%86,91 → %87,44)</div></div>
+    <div class="kpi"><div class="v" style="color:var(--neg)">≈ %38</div><div class="l">daha uzun eğitim<br>(11,4 → 15,7 sn)</div></div>
+    <div class="kpi"><div class="v">≈ %4,5</div><div class="l">daha fazla parametre<br>(27.562 → 28.794)</div></div>
+  </div>
+  <div class="card acc mt2">
+    <h3>Süre neden parametreden çok daha fazla arttı?</h3>
+    Filtreler resmin <b>her konumunda</b> tekrar tekrar uygulanır. Filtre sayısı 2 katına çıkınca konvolüsyon katmanlarındaki işlem sayısı da <b>≈ 2 katına</b> çıkar. Hız, parametre sayısına değil <b>işlem sayısına</b> bağlıdır.
+  </div>
+  <aside class="notes">
+    <p>Filtre sayısını iki katına çıkarmak yaklaşık 0,5 puanlık doğruluk kazancı sağladı, buna karşılık eğitim süresi yaklaşık %38 uzadı. Parametre sayısı ise sadece %4,5 arttı; artış hem ilk katmandan hem de artık 16 kanala bakan ikinci konvolüsyondan geliyor.</p>
+    <p>Süre parametreden çok daha fazla arttı, çünkü bir filtrenin ağırlıkları bir kez saklanır ama resmin her konumunda tekrar kullanılır. Yani modelin hızı yapılan işlem sayısına bağlı. İki deneyde de eğitim-test farkı 1,2–1,3 puan; ezberleme oluşmadı.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 50 HER ZAMAN İYİ Mİ -->
+<section class="slide" data-sec="Bölüm 8 · Filtre sayısı deneyi">
+  <h2>Daha fazla filtre her zaman daha iyi mi? <span class="c-neg">Hayır.</span></h2>
+  <div class="cols" style="gap:40px">
+    <div class="card"><h3>Maliyet artar</h3>Eğitim ve tahmin süresi uzar, bellek büyür.</div>
+    <div class="card"><h3>Kazanç azalır</h3>Yeni filtreler benzer / gereksiz özellikler öğrenir; basit veri setinde bu nokta erken gelir.</div>
+    <div class="card"><h3>Ezberleme riski</h3>Parametre arttıkça kapasite artar; test doğruluğu sabit kalabilir ya da düşebilir.</div>
+    <div class="card"><h3>Probleme bağlı</h3>Veri karmaşıklığına, miktarına, donanıma göre; doğrulama verisiyle denenerek seçilir.</div>
+  </div>
+  <div class="card orange mt" style="font-size:27px"><b>Sınırlılık:</b> her model tek kez, tek seed (42) ile eğitildi. 0,5 puanlık farkın bir kısmı rastlantı olabilir; farklı seed'lerle tekrar edip ortalama alınmalı.</div>
+  <aside class="notes">
+    <p>Bu deneyde bile kazanç küçük, maliyet belirgin. Genel olarak filtre sayısı arttıkça hesaplama maliyeti artar, belli bir noktadan sonra kazanç azalır ve parametre arttıkça ezberleme riski yükselir.</p>
+    <p>Doğru sayı veri setine ve donanıma bağlıdır ve doğrulama verisi üzerinde denenerek bulunmalıdır. Filtre sayısı, doğruluk ile maliyet arasında denge kurularak seçilmesi gereken bir hiperparametre.</p>
+    <p>Dürüst olmak gerekirse deneyim tek seed ile yapıldı; daha güvenilir sonuç için birkaç farklı seed ile tekrarlayıp ortalamak gerekir.</p>
+  </aside>
+</section>
+
+<!-- ======================================================= 52 SÖZLÜK 1 -->
+<section class="slide" data-sec="Kapanış">
+  <h2>Terimler sözlüğü (1/2)</h2>
+  <dl class="gl">
+    <div><dt>Evrişim <span class="en">(Convolution)</span></dt><dd>Filtreyi görüntüde kaydırıp her konumda çarp-topla ile yeni değer üretme.</dd></div>
+    <div><dt>Filtre <span class="en">(Kernel)</span></dt><dd>Konvolüsyonda kullanılan, eğitimle öğrenilen küçük ağırlık matrisi.</dd></div>
+    <div><dt>Özellik haritası <span class="en">(Feature map)</span></dt><dd>Bir filtrenin görüntü üzerinde ürettiği çıktı; bir kanal.</dd></div>
+    <div><dt>Havuzlama <span class="en">(Pooling)</span></dt><dd>Bölgeleri tek değerle özetleyip boyutu küçültme; parametresi yok.</dd></div>
+    <div><dt>Adım <span class="en">(Stride)</span></dt><dd>Filtrenin / pencerenin her seferde kaç piksel kaydığı.</dd></div>
+    <div><dt>Dolgu <span class="en">(Padding)</span></dt><dd>Kenarlara 0 ekleme. 'valid': dolgu yok · 'same': boyut korunur.</dd></div>
+    <div><dt>Aktivasyon <span class="en">(Activation)</span></dt><dd>Ağa doğrusal olmayanlık kazandıran fonksiyon.</dd></div>
+    <div><dt>ReLU</dt><dd>max(0, x): negatifleri 0 yapar, pozitifleri geçirir.</dd></div>
+    <div><dt>Softmax</dt><dd>Puanları 0–1 arası, toplamı 1 olan olasılıklara çevirir.</dd></div>
+    <div><dt>Düzleştirme <span class="en">(Flatten)</span></dt><dd>Çok boyutlu veriyi tek boyutlu vektöre dizme.</dd></div>
+  </dl>
+  <aside class="notes"><p>Sunumda geçen terimlerin kısa tanımları. Sorular sırasında gerekirse bu iki slayta dönebilirim.</p></aside>
+</section>
+
+<!-- ======================================================= 53 SÖZLÜK 2 -->
+<section class="slide" data-sec="Kapanış">
+  <h2>Terimler sözlüğü (2/2)</h2>
+  <dl class="gl">
+    <div><dt>Tam bağlantılı katman <span class="en">(Dense)</span></dt><dd>Her nöronu önceki katmanın tüm nöronlarına bağlı katman.</dd></div>
+    <div><dt>Ağırlık <span class="en">(Weight)</span></dt><dd>Bir girişin önemini belirleyen, öğrenilen sayı.</dd></div>
+    <div><dt>Bias</dt><dd>Toplama eklenen, öğrenilen eşik / kaydırma terimi.</dd></div>
+    <div><dt>Kayıp <span class="en">(Loss)</span></dt><dd>Tahmin ile gerçek etiket arasındaki hatanın ölçüsü.</dd></div>
+    <div><dt>Doğruluk <span class="en">(Accuracy)</span></dt><dd>Doğru tahmin sayısı / toplam tahmin sayısı.</dd></div>
+    <div><dt>Epoch</dt><dd>Tüm eğitim verisinin modelden bir kez geçmesi.</dd></div>
+    <div><dt>Batch</dt><dd>Ağırlıklar güncellenmeden önce birlikte işlenen örnek grubu (burada 64).</dd></div>
+    <div><dt>Geri yayılım <span class="en">(Backpropagation)</span></dt><dd>Hatanın geriye taşınıp her ağırlığın gradyanının hesaplanması.</dd></div>
+    <div><dt>Aşırı öğrenme <span class="en">(Overfitting)</span></dt><dd>Eğitim verisini ezberleyip yeni veride başarısız olma.</dd></div>
+    <div><dt>he_normal</dt><dd>Ağırlıkları ortalama 0, σ = √(2/fan_in) kesik normal dağılımla başlatma.</dd></div>
+  </dl>
+  <aside class="notes"><p>Sözlüğün ikinci kısmı: eğitimle ilgili terimler.</p></aside>
+</section>
+
+<!-- ======================================================= 54 TEŞEKKÜRLER -->
+<section class="slide title-slide">
+  <h1 style="font-size:110px">Teşekkürler</h1>
+  <div class="meta" style="font-size:44px">Sorular?</div>
+  <div class="tech">Python · TensorFlow / Keras · Fashion-MNIST</div>
+  <aside class="notes">
+    <p>Dinlediğiniz için teşekkürler. Sorularınızı alabilirim; O tuşu ile genel görünümü açıp ilgili slayta hızlıca dönebilirim.</p>
+  </aside>
+</section>
+
+</div>
+</div>
+
+<div id="notes"><div class="inner"><div class="hd"></div><div class="body"></div></div></div>
+<div id="overview"><div class="hint">Genel görünüm: bir slayta tıklayın · Esc / O ile kapatın</div><div class="grid"></div></div>
+<div id="help">→ / Space ileri · ← geri · N notlar · O genel görünüm · F tam ekran</div>
+
+<script src="js/highlight.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/animations.js"></script>
+</body>
+</html>
