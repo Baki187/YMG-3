@@ -5,7 +5,7 @@ Bilgisayarlı Görme dersi ödevi. Fashion-MNIST veri seti üzerinde TensorFlow/
 ## İçerik
 
 ```
-odev/
+Derin-Ogrenme-Odevi/
 ├── cnn_odevi.ipynb                  # Ana notebook: kodlar, çıktılar ve soruların cevapları
 ├── bolum2_cevaplar.md               # 2. Bölüm: temel kavramlar soru-cevap
 ├── bolum3_filtreler.png             # Konvolüsyon filtrelerinin görselleştirmesi
@@ -60,7 +60,7 @@ pip install -r requirements.txt
 ## Çalıştırma
 
 ```bash
-jupyter notebook odev/cnn_odevi.ipynb
+jupyter notebook Derin-Ogrenme-Odevi/cnn_odevi.ipynb
 ```
 
 Notebook'u hücreleri sırayla çalıştırarak baştan sona yürütebilirsiniz. Notebook çıktılarıyla birlikte kaydedildiği için hiçbir şey kurmadan GitHub üzerinden de okunabilir.
@@ -69,7 +69,7 @@ Notebook'u hücreleri sırayla çalıştırarak baştan sona yürütebilirsiniz.
 
 ## Sunum
 
-`odev/sunum/index.html` dosyasını bir tarayıcıda açmanız yeterlidir; ek kurulum gerekmez.
+`Derin-Ogrenme-Odevi/sunum/index.html` dosyasını bir tarayıcıda açmanız yeterlidir; ek kurulum gerekmez.
 
 ## Kullanılan kütüphaneler
 
